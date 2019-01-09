@@ -39,7 +39,7 @@ class ChipEight:
             self.memory[i+512] = data[i]
         print(f'Loaded ROM: {name}')
 
-    def emulate_cycle(self):
+    def handle_opcode(self):
         # Fetch opcode
         self.opcode = self.memory[self.pc] << 8 | self.memory[self.pc+1]
         opcode_msb = self.opcode & 0xF000
@@ -170,7 +170,8 @@ class ChipEight:
                 for col in range(8):
                     if (self.memory[self.I + row] & (0x80 >> col)) != 0:
                         i = x + col + ((y + row) * 64)
-                        if len(self.gfx) > i:
+                        # ignore drawing outside
+                        if i < len(self.gfx):
                             if self.gfx[i] == 1:
                                 self.V[0xF] = 1
                             self.gfx[i] ^= 1
@@ -180,7 +181,7 @@ class ChipEight:
         elif opcode_msb == 0xE000:
             opcode_2lsb = self.opcode & 0x00FF
             if opcode_2lsb == 0x9E:
-                if self.keyboard[self.V[(self.opcode & 0x0F00) >> 8]] != 0:
+                if self.keyboard[self.V[(self.opcode & 0x0F00) >> 8]] == 1:
                     self.pc += 2
                 self.pc += 2
                 print('EX9E')
@@ -200,7 +201,7 @@ class ChipEight:
             elif opcode_2lsb == 0x0A:
                 key_pressed = False
                 for i in range(len(self.keyboard)):
-                    if self.keyboard[i] != 0:
+                    if self.keyboard[i] == 1:
                         self.V[(self.opcode & 0x0F00) >> 8] = i
                         key_pressed = True
                 if key_pressed:
@@ -247,10 +248,10 @@ class ChipEight:
         else:
             print('Unknown!')
 
-        # Update timers
-        if self.delay_timer > 0:
+    def handle_timers(self):
+        if self.delay_timer != 0:
             self.delay_timer -= 1
-        if self.sound_timer > 0:
+        if self.sound_timer != 0:
             self.sound_timer -= 1
 
     def handle_key(self, key, value):

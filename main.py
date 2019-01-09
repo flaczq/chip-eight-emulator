@@ -1,8 +1,7 @@
-import time
 import numpy as np
 
 from modules.chip import ChipEight
-from modules.additional import Graphics, Sound, Keyboard
+from modules.additional import Engine, Graphics, Sound
 
 
 def initChipEight(rom_name):
@@ -16,8 +15,8 @@ def main(rom_name):
     print('# CHIP-EIGHT EMULATOR #')
 
     # Init additional
+    engine = Engine()
     graphics = Graphics()
-    keyboard = Keyboard()
     sound = Sound()
 
     # Init Chip-8
@@ -25,24 +24,21 @@ def main(rom_name):
 
     # Emulation loop
     while True:
-        chip_eight.emulate_cycle()
+        engine.handle_time()
+        chip_eight.handle_opcode()
 
         if chip_eight.draw:
             graphics.draw(chip_eight.gfx)
             chip_eight.draw = False
-
-        if chip_eight.clear:
+        elif chip_eight.clear:
             graphics.clear()
             chip_eight.clear = False
 
         if chip_eight.sound_timer != 0:
             sound.play()
 
-        key, value = keyboard.check_keys()
-        if key != None:
-            chip_eight.handle_key(key, value)
-
-        time.sleep(1/60)
+        engine.check_events(chip_eight)
+        chip_eight.handle_timers()
 
 
-main('PONG')
+main('PONG2')
