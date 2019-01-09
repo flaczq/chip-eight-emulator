@@ -14,7 +14,7 @@ class Graphics:
         pygame.init()
         self.screen = pygame.display.set_mode((width, height))
         pygame.display.set_caption('CHIP-EIGHT EMULATOR')
-        self.draw()
+        self.clear()
 
     def update(self):
         pygame.display.flip()
@@ -28,9 +28,9 @@ class Graphics:
         # print('Drawing...')
         col, row = 0, 0
         for i in range(len(sprite)):
+            col = (i % WIDTH) * SCALE
+            row = int(i / WIDTH) * SCALE
             if sprite[i] == 1:
-                col = (i % WIDTH) * SCALE
-                row = int(i / WIDTH) * SCALE
                 if self.screen.get_at((col, row)) == COLOR_OFF:
                     pygame.draw.rect(self.screen, COLOR_ON, (col, row, SCALE, SCALE))
                 else:
@@ -57,5 +57,7 @@ class Keyboard:
                 pygame.quit()
                 sys.exit()
             if event.type == pygame.KEYDOWN:
-                return 0, 1
-        return None, 0
+                return event.key, 1
+            if event.type == pygame.KEYUP:
+                return event.key, 0
+        return None, None

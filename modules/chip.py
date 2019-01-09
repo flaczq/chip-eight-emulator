@@ -1,11 +1,10 @@
-from modules.chip_fontset import chip_fontset
+from modules.sets import chip_fontset, chip_keys
 from random import randint
 
 
 class ChipEight:
     def __init__(self):
         print('Chip-8 initiation')
-
         # 35 operation codes
         self.opcode = 0
         # 4096B memory size
@@ -26,12 +25,11 @@ class ChipEight:
         # Stack pointer
         self.sp = 0
         # Keyboard state (HEX = 16b)
-        self.keys = [0]*16
+        self.keyboard = [0]*16
         # Draw flag
         self.draw = False
         # Clear flag
         self.clear = False
-
         # Load fontset
         for i in range(80):
             self.memory[i] = chip_fontset[i]
@@ -50,18 +48,18 @@ class ChipEight:
 
         # Decode and execute opcode
         if opcode_msb == 0x0:
-            if self.opcode == 0x00E0:
+            if self.opcode == 0xE0:
                 self.gfx = [0]*64*32
                 self.clear = True
                 self.pc += 2
                 print('00E0')
-            elif self.opcode == 0x00EE:
+            elif self.opcode == 0xEE:
                 self.sp -= 1
                 self.pc = self.stack[self.sp]
+                self.pc += 2
                 print('00EE')
             else:
                 # not used, ignored
-                self.pc += 2
                 print('0NNN')
         elif opcode_msb == 0x1000:
             self.pc = self.opcode & 0x0FFF
@@ -96,32 +94,31 @@ class ChipEight:
             print('7XNN')
         elif opcode_msb == 0x8000:
             opcode_lsb = self.opcode & 0x000F
-            if opcode_lsb == 0x0:
+            if opcode_lsb == 0x00:
                 self.V[(self.opcode & 0x0F00) >> 8] = self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY0')
-            elif opcode_lsb == 0x1:
+            elif opcode_lsb == 0x01:
                 self.V[(self.opcode & 0x0F00) >> 8] |= self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY1')
-            elif opcode_lsb == 0x2:
+            elif opcode_lsb == 0x02:
                 self.V[(self.opcode & 0x0F00) >> 8] &= self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY2')
-            elif opcode_lsb == 0x3:
+            elif opcode_lsb == 0x03:
                 self.V[(self.opcode & 0x0F00) >> 8] ^= self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY3')
-            elif opcode_lsb == 0x4:
-                self.V[(self.opcode & 0x0F00) >> 8] += self.V[(self.opcode & 0x00F0) >> 4]
-                if self.V[(self.opcode & 0x0F00) >> 8] > 0xFF:
-                    self.V[(self.opcode & 0x0F00) >> 8] &= 0xFF
+            elif opcode_lsb == 0x04:
+                if self.V[(self.opcode & 0x00F0) >> 4] + self.V[(self.opcode & 0x0F00) >> 8] > 0xFF:
                     self.V[0xF] = 1
                 else:
                     self.V[0xF] = 0
+                self.V[(self.opcode & 0x0F00) >> 8] += self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY4')
-            elif opcode_lsb == 0x5:
+            elif opcode_lsb == 0x05:
                 if self.V[(self.opcode & 0x00F0) >> 4] > self.V[(self.opcode & 0x0F00) >> 8]:
                     self.V[0xF] = 0
                 else:
@@ -129,12 +126,12 @@ class ChipEight:
                 self.V[(self.opcode & 0x0F00) >> 8] -= self.V[(self.opcode & 0x00F0) >> 4]
                 self.pc += 2
                 print('8XY5')
-            elif opcode_lsb == 0x6:
+            elif opcode_lsb == 0x06:
                 self.V[0xF] = self.V[(self.opcode & 0x0F00) >> 8] & 0x1
                 self.V[(self.opcode & 0x0F00) >> 8] >>= 1
                 self.pc += 2
                 print('8XY6')
-            elif opcode_lsb == 0x7:
+            elif opcode_lsb == 0x07:
                 if self.V[(self.opcode & 0x0F00) >> 8] > self.V[(self.opcode & 0x00F0) >> 4]:
                     self.V[0xF] = 0
                 else:
@@ -142,13 +139,12 @@ class ChipEight:
                 self.V[(self.opcode & 0x0F00) >> 8] = self.V[(self.opcode & 0x00F0) >> 4] - self.V[(self.opcode & 0x0F00) >> 8]
                 self.pc += 2
                 print('8XY7')
-            elif opcode_lsb == 0xE:
-                self.V[0xF] = self.V[(self.opcode & 0x0F00) >> 8] & 0x80
+            elif opcode_lsb == 0x0E:
+                self.V[0xF] = self.V[(self.opcode & 0x0F00) >> 8] >> 7
                 self.V[(self.opcode & 0x0F00) >> 8] <<= 1
                 self.pc += 2
                 print('8XYE')
             else:
-                self.pc += 2
                 print('Unknown!')
         elif opcode_msb == 0x9000:
             if self.V[(self.opcode & 0x0F00) >> 8] != self.V[(self.opcode & 0x00F0) >> 4]:
@@ -174,24 +170,27 @@ class ChipEight:
                 for col in range(8):
                     if (self.memory[self.I + row] & (0x80 >> col)) != 0:
                         i = x + col + ((y + row) * 64)
-                        if self.gfx[i] == 1:
-                            self.V[0xF] = 1
-                        self.gfx[i] ^= 1
+                        if len(self.gfx) > i:
+                            if self.gfx[i] == 1:
+                                self.V[0xF] = 1
+                            self.gfx[i] ^= 1
             self.draw = True
             self.pc += 2
             print('DXYN')
         elif opcode_msb == 0xE000:
             opcode_2lsb = self.opcode & 0x00FF
             if opcode_2lsb == 0x9E:
-                if self.keys[self.V[(self.opcode & 0x0F00) >> 8]] == 1:
+                if self.keyboard[self.V[(self.opcode & 0x0F00) >> 8]] != 0:
                     self.pc += 2
                 self.pc += 2
                 print('EX9E')
             elif opcode_2lsb == 0xA1:
-                if self.keys[self.V[(self.opcode & 0x0F00) >> 8]] == 0:
+                if self.keyboard[self.V[(self.opcode & 0x0F00) >> 8]] == 0:
                     self.pc += 2
                 self.pc += 2
                 print('EXA1')
+            else:
+                print('Unknown!')
         elif opcode_msb == 0xF000:
             opcode_2lsb = self.opcode & 0x00FF
             if opcode_2lsb == 0x07:
@@ -200,11 +199,10 @@ class ChipEight:
                 print('FX07')
             elif opcode_2lsb == 0x0A:
                 key_pressed = False
-                for i in range(len(self.keys)):
-                    if self.keys[i] == 1:
+                for i in range(len(self.keyboard)):
+                    if self.keyboard[i] != 0:
                         self.V[(self.opcode & 0x0F00) >> 8] = i
                         key_pressed = True
-                        break
                 if key_pressed:
                     self.pc += 2
                 print('FX0A')
@@ -217,6 +215,10 @@ class ChipEight:
                 self.pc += 2
                 print('FX18')
             elif opcode_2lsb == 0x1E:
+                if self.I + self.V[(self.opcode & 0x0F00) >> 8] > 0xFFF:
+                    self.V[0xF] = 1
+                else:
+                    self.V[0xF] = 0
                 self.I += self.V[(self.opcode & 0x0F00) >> 8]
                 self.pc += 2
                 print('FX1E')
@@ -227,7 +229,7 @@ class ChipEight:
             elif opcode_2lsb == 0x33:
                 self.memory[self.I] = int(self.V[(self.opcode & 0x0F00) >> 8] / 100)
                 self.memory[self.I+1] = int(self.V[(self.opcode & 0x0F00) >> 8] / 10) % 10
-                self.memory[self.I+2] = self.V[(self.opcode & 0x0F00) >> 8] % 10
+                self.memory[self.I+2] = (self.V[(self.opcode & 0x0F00) >> 8] % 100) % 10
                 self.pc += 2
                 print('FX33')
             elif opcode_2lsb == 0x55:
@@ -241,10 +243,8 @@ class ChipEight:
                 self.pc += 2
                 print('FX65')
             else:
-                self.pc += 2
                 print('Unknown!')
         else:
-            self.pc += 2
             print('Unknown!')
 
         # Update timers
@@ -254,5 +254,5 @@ class ChipEight:
             self.sound_timer -= 1
 
     def handle_key(self, key, value):
-        self.keys[key] = value
-        print(f'Set key: {key} to value: {value}')
+        if key in chip_keys:
+            self.keyboard[chip_keys.index(key)] = value
