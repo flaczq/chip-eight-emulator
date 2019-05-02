@@ -41,4 +41,4 @@ def main(rom_name):
         chip_eight.handle_timers()
 
 
-main('PONG2')
+main('BRIX')
